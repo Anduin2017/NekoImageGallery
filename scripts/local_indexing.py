@@ -1,4 +1,3 @@
-
 if __name__ == '__main__':
     import sys
 
@@ -6,6 +5,7 @@ if __name__ == '__main__':
 
 import argparse
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from shutil import copy2
@@ -71,19 +71,32 @@ async def main(args):
         static_path.mkdir()
     buffer = []
     counter = 0
-    for item in root.glob('**/*.*'):
-        counter += 1
-        logger.info("[{}] Indexing {}", str(counter), item.relative_to(root).__str__())
-        if item.suffix in ['.jpg', '.png', '.jpeg', '.jfif', '.webp']:
-            imgdata = copy_and_index(item)
-            if imgdata is not None:
-                buffer.append(imgdata)
-            if len(buffer) >= 20:
-                logger.info("Upload {} element to database", len(buffer))
-                await db_context.insertItems(buffer)
-                buffer.clear()
-        else:
-            logger.warning("Unsupported file type: {}. Skip...", item.suffix)
+
+    tasks = []
+    db_tasks: list[asyncio.Task] = []
+
+    def post_exec(result):
+        nonlocal buffer
+        if result is None:
+            return
+        buffer.append(result)
+        if len(buffer) >= 20:
+            l_buffer = buffer
+            buffer = []
+            logger.info("Upload {} element to database", len(l_buffer))
+            db_tasks.append(asyncio.create_task(db_context.insertItems(l_buffer)))
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        for item in root.glob('**/*.*'):
+            counter += 1
+            logger.info("[{}] Indexing {}", str(counter), item.relative_to(root).__str__())
+            if item.suffix in ['.jpg', '.png', '.jpeg', '.jfif', '.webp']:
+                tasks.append(executor.submit(copy_and_index, item).add_done_callback(post_exec))
+            else:
+                logger.warning("Unsupported file type: {}. Skip...", item.suffix)
+        executor.shutdown(wait=True)
+        for task in db_tasks:
+            await task
     if len(buffer) > 0:
         logger.info("Upload {} element to database", len(buffer))
         await db_context.insertItems(buffer)
