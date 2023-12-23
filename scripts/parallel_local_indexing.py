@@ -23,7 +23,7 @@ async def main(args):
     tasks = []
     db_tasks: list[asyncio.Task] = []
 
-    event_loop = asyncio.get_event_loop()
+    event_loop = asyncio.get_running_loop()
 
     def post_exec(f: Future):
         nonlocal buffer
@@ -46,8 +46,6 @@ async def main(args):
             proc_task = executor.submit(copy_and_index, item)
             proc_task.add_done_callback(post_exec)
             tasks.append(proc_task)
-
-        # executor.shutdown(wait=True) # This will aggressively block the main thread
 
         while len(tasks) > 0:
             for task in db_tasks:  # Attempt to Complete all db_action tasks

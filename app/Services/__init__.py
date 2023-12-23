@@ -2,7 +2,7 @@ from .transformers_service import TransformersService
 from .vector_db_context import VectorDbContext
 from ..config import config, environment
 
-transformers_service = TransformersService()
+transformers_service = TransformersService() if not environment.local_thumb else None
 db_context = VectorDbContext()
 ocr_service = None
 

@@ -49,6 +49,7 @@ class Config(BaseSettings):
 
 class Environment(BaseModel):
     local_indexing: bool = False
+    local_thumb: bool = False
 
 
 config = Config()

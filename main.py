@@ -63,8 +63,16 @@ if __name__ == '__main__':
 
             asyncio.run(local_indexing.main(args))
     elif args.local_create_thumbnail:
-        from scripts import local_create_thumbnail
+        from app.config import environment
 
-        asyncio.run(local_create_thumbnail.main())
+        environment.local_thumb = True
+        if args.workers > 1:
+            from scripts import parallel_create_thumbnail
+
+            asyncio.run(parallel_create_thumbnail.main(args))
+        else:
+            from scripts import local_create_thumbnail
+
+            asyncio.run(local_create_thumbnail.main())
     else:
         uvicorn.run("app.webapp:app", host=args.host, port=args.port)

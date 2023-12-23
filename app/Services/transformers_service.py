@@ -8,7 +8,7 @@ from numpy import ndarray
 from torch import FloatTensor, no_grad
 from transformers import CLIPProcessor, CLIPModel, BertTokenizer, BertModel
 
-from app.config import config, environment
+from app.config import config
 
 
 class TransformersService:
@@ -26,7 +26,7 @@ class TransformersService:
             self.bert_tokenizer = BertTokenizer.from_pretrained(config.ocr_search.bert_model)
             logger.success("BERT Model loaded successfully")
         else:
-            logger.info("OCR search is disabled. Skipping OCR and BERT model loading.")
+            logger.info("OCR search is disabled. Skipping BERT model loading.")
 
     @no_grad()
     def get_image_vector(self, image: Image.Image) -> ndarray:
@@ -38,7 +38,6 @@ class TransformersService:
         logger.success("Image processed, now inferencing with CLIP model...")
         outputs: FloatTensor = self.clip_model.get_image_features(**inputs)
         logger.success("Inference done. Time elapsed: {:.2f}s", time() - start_time)
-        logger.info("Norm: {}", outputs.norm(dim=-1).item())
         outputs /= outputs.norm(dim=-1, keepdim=True)
         return outputs.numpy(force=True).reshape(-1)
 
@@ -50,7 +49,6 @@ class TransformersService:
         logger.success("Text processed, now inferencing with CLIP model...")
         outputs: FloatTensor = self.clip_model.get_text_features(**inputs)
         logger.success("Inference done. Time elapsed: {:.2f}s", time() - start_time)
-        logger.info("Norm: {}", outputs.norm(dim=-1).item())
         outputs /= outputs.norm(dim=-1, keepdim=True)
         return outputs.numpy(force=True).reshape(-1)
 
