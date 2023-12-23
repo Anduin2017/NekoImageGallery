@@ -1,3 +1,4 @@
+from threading import Lock
 from time import time
 
 import numpy as np
@@ -12,6 +13,7 @@ class OCRService:
     def __init__(self):
         self._device = config.device
         self._easyOCRModule, self._paddleOCRModule = None, None
+        self._lock = Lock()
         if self._device == "auto":
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -37,7 +39,9 @@ class EasyPaddleOCRService(OCRService):
         logger.success("EasyPaddleOCR loaded successfully")
 
     def _easy_paddleocr_process(self, img: Image.Image) -> str:
+        self._lock.acquire()
         _, _ocrResult, _ = self._paddleOCRModule.ocr(np.array(img))
+        self._lock.release()
         if _ocrResult:
             return "".join(itm[0] for itm in _ocrResult if float(itm[1]) > config.ocr_search.ocr_min_confidence)
         return ""

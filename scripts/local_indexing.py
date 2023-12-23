@@ -5,7 +5,7 @@ if __name__ == '__main__':
 
 import argparse
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future
 from datetime import datetime
 from pathlib import Path
 from shutil import copy2
@@ -75,8 +75,12 @@ async def main(args):
     tasks = []
     db_tasks: list[asyncio.Task] = []
 
-    def post_exec(result):
+    event_loop = asyncio.get_event_loop()
+
+    def post_exec(f: Future):
         nonlocal buffer
+        tasks.remove(f)
+        result = f.result()
         if result is None:
             return
         buffer.append(result)
@@ -84,17 +88,31 @@ async def main(args):
             l_buffer = buffer
             buffer = []
             logger.info("Upload {} element to database", len(l_buffer))
-            db_tasks.append(asyncio.create_task(db_context.insertItems(l_buffer)))
+            db_tasks.append(asyncio.ensure_future(db_context.insertItems(l_buffer), loop=event_loop))
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         for item in root.glob('**/*.*'):
+
             counter += 1
             logger.info("[{}] Indexing {}", str(counter), item.relative_to(root).__str__())
-            if item.suffix in ['.jpg', '.png', '.jpeg', '.jfif', '.webp']:
-                tasks.append(executor.submit(copy_and_index, item).add_done_callback(post_exec))
-            else:
+
+            if item.suffix not in ['.jpg', '.png', '.jpeg', '.jfif', '.webp']:
                 logger.warning("Unsupported file type: {}. Skip...", item.suffix)
-        executor.shutdown(wait=True)
+                continue
+
+            proc_task = executor.submit(copy_and_index, item)
+            proc_task.add_done_callback(post_exec)
+            tasks.append(proc_task)
+
+        # executor.shutdown(wait=True) # This will aggressively block the main thread
+
+        while len(tasks) > 0:
+            for task in db_tasks:  # Attempt to Complete all db_action tasks
+                if not task.done():
+                    await task
+                db_tasks.remove(task)
+            await asyncio.sleep(1)
+
         for task in db_tasks:
             await task
     if len(buffer) > 0:
