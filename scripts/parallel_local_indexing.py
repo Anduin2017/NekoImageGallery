@@ -6,7 +6,8 @@ from loguru import logger
 
 from app.Services import db_context
 from app.config import config
-from .local_indexing import copy_and_index, gather_valid_files
+from .local_indexing import copy_and_index
+from .utilities import gather_valid_files
 
 
 @logger.catch()

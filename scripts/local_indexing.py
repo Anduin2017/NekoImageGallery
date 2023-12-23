@@ -1,4 +1,3 @@
-import argparse
 from datetime import datetime
 from pathlib import Path
 from shutil import copy2
@@ -10,13 +9,7 @@ from loguru import logger
 from app.Models.img_data import ImageData
 from app.Services import transformers_service, db_context, ocr_service
 from app.config import config
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Create Qdrant collection')
-    parser.add_argument('--copy-from', dest="local_index_target_dir", type=str, required=True,
-                        help="Copy from this directory")
-    return parser.parse_args()
+from .utilities import gather_valid_files
 
 
 def copy_and_index(filePath: Path) -> ImageData | None:
@@ -54,15 +47,6 @@ def copy_and_index(filePath: Path) -> ImageData | None:
     # copy to static
     copy2(filePath, Path(config.static_file.path) / f'{id}{img_ext}')
     return imgdata
-
-
-def gather_valid_files(root: Path):
-    for item in root.glob('**/*.*'):
-        if item.suffix in ['.jpg', '.png', '.jpeg', '.jfif', '.webp']:
-            yield item
-        else:
-            logger.warning("Unsupported file type: {}. Skip...", item.suffix)
-
 
 @logger.catch()
 async def main(args):
