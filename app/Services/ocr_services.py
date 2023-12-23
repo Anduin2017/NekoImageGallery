@@ -1,3 +1,4 @@
+from threading import Lock
 from time import time
 
 import numpy as np
@@ -34,10 +35,13 @@ class EasyPaddleOCRService(OCRService):
         super().__init__()
         from easypaddleocr import EasyPaddleOCR
         self._paddleOCRModule = EasyPaddleOCR(use_angle_cls=True, needWarmUp=True, devices=self._device)
+        self._lock = Lock()
         logger.success("EasyPaddleOCR loaded successfully")
 
     def _easy_paddleocr_process(self, img: Image.Image) -> str:
+        self._lock.acquire()
         _, _ocrResult, _ = self._paddleOCRModule.ocr(np.array(img))
+        self._lock.release()
         if _ocrResult:
             return "".join(itm[0] for itm in _ocrResult if float(itm[1]) > config.ocr_search.ocr_min_confidence)
         return ""

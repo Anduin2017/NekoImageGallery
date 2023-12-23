@@ -1,11 +1,4 @@
-
-if __name__ == '__main__':
-    import sys
-
-    sys.path.insert(1, './')
-
 import argparse
-import asyncio
 from datetime import datetime
 from pathlib import Path
 from shutil import copy2
@@ -63,33 +56,33 @@ def copy_and_index(filePath: Path) -> ImageData | None:
     return imgdata
 
 
+def gather_valid_files(root: Path):
+    for item in root.glob('**/*.*'):
+        if item.suffix in ['.jpg', '.png', '.jpeg', '.jfif', '.webp']:
+            yield item
+        else:
+            logger.warning("Unsupported file type: {}. Skip...", item.suffix)
+
+
 @logger.catch()
 async def main(args):
     root = Path(args.local_index_target_dir)
     static_path = Path(config.static_file.path)
-    if not static_path.exists():
-        static_path.mkdir()
+    static_path.mkdir(exist_ok=True)
     buffer = []
     counter = 0
-    for item in root.glob('**/*.*'):
+    for item in gather_valid_files(root):
         counter += 1
         logger.info("[{}] Indexing {}", str(counter), item.relative_to(root).__str__())
-        if item.suffix in ['.jpg', '.png', '.jpeg', '.jfif', '.webp']:
-            imgdata = copy_and_index(item)
-            if imgdata is not None:
-                buffer.append(imgdata)
-            if len(buffer) >= 20:
-                logger.info("Upload {} element to database", len(buffer))
-                await db_context.insertItems(buffer)
-                buffer.clear()
-        else:
-            logger.warning("Unsupported file type: {}. Skip...", item.suffix)
+        imgdata = copy_and_index(item)
+        if imgdata is not None:
+            buffer.append(imgdata)
+        if len(buffer) >= 20:
+            logger.info("Upload {} element to database", len(buffer))
+            await db_context.insertItems(buffer)
+            buffer.clear()
+
     if len(buffer) > 0:
         logger.info("Upload {} element to database", len(buffer))
         await db_context.insertItems(buffer)
         logger.success("Indexing completed! {} images indexed", counter)
-
-
-if __name__ == '__main__':
-    args = parse_args()
-    asyncio.run(main(args))
